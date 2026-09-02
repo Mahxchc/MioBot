@@ -4,8 +4,8 @@
 // File: bot.js
 // =====================================
 
-const TelegramBot = require("node-telegram-bot-api");
-const http = require("http");
+import TelegramBot from "node-telegram-bot-api";
+import http from "node:http";
 
 // =====================================
 // تنظیمات
@@ -13,21 +13,17 @@ const http = require("http");
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// نام کاربری مالک ربات بدون @
 const OWNER_USERNAME = "mehdi2410l";
 
-// آیدی گروهی که ربات باید داخل آن «میو» بفرستد
-// در Render به صورت Environment Variable قرار می‌گیرد.
 const GROUP_CHAT_ID = process.env.GROUP_CHAT_ID;
 
-// پورت مخصوص Render
 const PORT = process.env.PORT || 10000;
 
 // 5 دقیقه و 20 ثانیه
 const MIO_INTERVAL = 5 * 60 * 1000 + 20 * 1000;
 
 // =====================================
-// بررسی توکن
+// بررسی BOT_TOKEN
 // =====================================
 
 if (!BOT_TOKEN) {
@@ -44,7 +40,7 @@ const bot = new TelegramBot(BOT_TOKEN, {
 });
 
 // =====================================
-// توابع کمکی
+// بررسی مالک
 // =====================================
 
 function isOwner(msg) {
@@ -54,6 +50,10 @@ function isOwner(msg) {
 
     return username === OWNER_USERNAME.toLowerCase();
 }
+
+// =====================================
+// پیام دسترسی
+// =====================================
 
 async function sendSupportMessage(chatId) {
     try {
@@ -72,7 +72,7 @@ async function sendSupportMessage(chatId) {
 }
 
 // =====================================
-// /start
+// دستور /start
 // =====================================
 
 bot.onText(/^\/start$/, async (msg) => {
@@ -99,7 +99,7 @@ bot.onText(/^\/start$/, async (msg) => {
 });
 
 // =====================================
-// /status
+// دستور /status
 // =====================================
 
 bot.onText(/^\/status$/, async (msg) => {
@@ -131,9 +131,10 @@ bot.onText(/^\/status$/, async (msg) => {
 
 bot.on("message", async (msg) => {
     try {
-        if (!msg || !msg.text) return;
+        if (!msg || !msg.text) {
+            return;
+        }
 
-        // دستورات را جداگانه مدیریت می‌کنیم
         if (
             msg.text === "/start" ||
             msg.text === "/status"
@@ -141,7 +142,6 @@ bot.on("message", async (msg) => {
             return;
         }
 
-        // فقط مالک می‌تواند دستورات مدیریتی بفرستد
         if (!isOwner(msg)) {
             return;
         }
@@ -155,10 +155,11 @@ bot.on("message", async (msg) => {
 });
 
 // =====================================
-// ارسال «میو»
+// ارسال میو
 // =====================================
 
 async function sendMio() {
+
     if (!GROUP_CHAT_ID) {
         console.error(
             "⚠️ GROUP_CHAT_ID is not configured."
@@ -167,6 +168,7 @@ async function sendMio() {
     }
 
     try {
+
         await bot.sendMessage(
             GROUP_CHAT_ID,
             "میو"
@@ -178,6 +180,7 @@ async function sendMio() {
         );
 
     } catch (error) {
+
         console.error(
             "❌ Error sending میو:",
             error.message
@@ -186,7 +189,7 @@ async function sendMio() {
 }
 
 // =====================================
-// تایمر ۵ دقیقه و ۲۰ ثانیه
+// شروع تایمر
 // =====================================
 
 setInterval(
@@ -201,11 +204,11 @@ setInterval(
 const server = http.createServer(
     (req, res) => {
 
-        // Health Check
         if (
             req.method === "GET" &&
             req.url === "/"
         ) {
+
             res.writeHead(
                 200,
                 {
@@ -229,6 +232,7 @@ const server = http.createServer(
             req.method === "GET" &&
             req.url === "/health"
         ) {
+
             res.writeHead(
                 200,
                 {
@@ -254,7 +258,7 @@ const server = http.createServer(
 );
 
 // =====================================
-// شروع Web Server
+// شروع سرور
 // =====================================
 
 server.listen(
@@ -298,12 +302,13 @@ server.listen(
 );
 
 // =====================================
-// خطاهای Polling
+// خطای Polling
 // =====================================
 
 bot.on(
     "polling_error",
     (error) => {
+
         console.error(
             "❌ Telegram polling error:",
             error.message
@@ -312,12 +317,13 @@ bot.on(
 );
 
 // =====================================
-// خطاهای عمومی
+// خطای عمومی
 // =====================================
 
 process.on(
     "uncaughtException",
     (error) => {
+
         console.error(
             "❌ Uncaught Exception:",
             error
@@ -328,6 +334,7 @@ process.on(
 process.on(
     "unhandledRejection",
     (error) => {
+
         console.error(
             "❌ Unhandled Rejection:",
             error
