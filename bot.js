@@ -1,367 +1,336 @@
 // =====================================
 // ..M MioBot
-// Telegram Private Auto Mio Bot
+// Telegram Bot :: Render Web Service
 // File: bot.js
 // =====================================
 
-import "dotenv/config";
-import TelegramBot from "node-telegram-bot-api";
-
-const TOKEN = process.env.BOT_TOKEN;
+const TelegramBot = require("node-telegram-bot-api");
+const http = require("http");
 
 // =====================================
-// ..M OWNER CONFIG
+// تنظیمات
 // =====================================
 
-// فقط این حساب صاحب ربات است
+const BOT_TOKEN = process.env.BOT_TOKEN;
+
+// نام کاربری مالک ربات بدون @
 const OWNER_USERNAME = "mehdi2410l";
 
-// آیدی پشتیبانی
-const SUPPORT_USERNAME = "mehdi2410l";
+// آیدی گروهی که ربات باید داخل آن «میو» بفرستد
+// در Render به صورت Environment Variable قرار می‌گیرد.
+const GROUP_CHAT_ID = process.env.GROUP_CHAT_ID;
 
-
-// =====================================
-// ..M MIO CONFIG
-// =====================================
+// پورت مخصوص Render
+const PORT = process.env.PORT || 10000;
 
 // 5 دقیقه و 20 ثانیه
 const MIO_INTERVAL = 5 * 60 * 1000 + 20 * 1000;
 
+// =====================================
+// بررسی توکن
+// =====================================
 
-if (!TOKEN) {
+if (!BOT_TOKEN) {
     console.error("❌ BOT_TOKEN is not configured.");
     process.exit(1);
 }
 
+// =====================================
+// ساخت ربات
+// =====================================
 
-const bot = new TelegramBot(TOKEN, {
+const bot = new TelegramBot(BOT_TOKEN, {
     polling: true
 });
 
-
-const activeGroups = new Map();
-
-
-console.log("=====================================");
-console.log("🐱 ..M MioBot");
-console.log("🚀 Bot started successfully");
-console.log("⏱️ Mio interval: 5 minutes 20 seconds");
-console.log(`👑 Owner: @${OWNER_USERNAME}`);
-console.log("=====================================");
-
-
 // =====================================
-// ..M CHECK OWNER
+// توابع کمکی
 // =====================================
 
 function isOwner(msg) {
+    const username = String(
+        msg?.from?.username || ""
+    ).toLowerCase();
 
-    const username = msg?.from?.username;
-
-    if (!username) {
-        return false;
-    }
-
-    return username.toLowerCase() === OWNER_USERNAME.toLowerCase();
+    return username === OWNER_USERNAME.toLowerCase();
 }
 
-
-// =====================================
-// ..M ACCESS DENIED
-// =====================================
-
-async function sendAccessDenied(chatId) {
-
+async function sendSupportMessage(chatId) {
     try {
-
         await bot.sendMessage(
             chatId,
-            "⛔ دسترسی ندارید.\n\n" +
-            "این ربات خصوصی است.\n" +
-            "برای دریافت دسترسی لطفاً به پشتیبانی پیام دهید:\n\n" +
-            `👉 @${SUPPORT_USERNAME}`
+            "⛔ دسترسی شما فعال نیست.\n\n" +
+            "برای دریافت دسترسی، لطفاً به پشتیبانی پیام دهید:\n" +
+            "👉 @mehdi2410l"
         );
-
     } catch (error) {
-
         console.error(
-            "❌ Access denied message error:",
+            "❌ Support message error:",
             error.message
         );
-
     }
 }
 
-
 // =====================================
-// ..M START
-// =====================================
-
-bot.onText(/^\/start(?:@\w+)?$/i, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-
-    // فقط صاحب ربات
-    if (!isOwner(msg)) {
-
-        await sendAccessDenied(chatId);
-
-        return;
-    }
-
-
-    await bot.sendMessage(
-        chatId,
-        "🐱 سلام صاحب ربات!\n\n" +
-        "✅ MioBot فعال است.\n\n" +
-        "دستورات:\n" +
-        "/startmio — شروع میو\n" +
-        "/stopmio — توقف میو"
-    );
-
-});
-
-
-// =====================================
-// ..M START MIO
+// /start
 // =====================================
 
-bot.onText(/^\/startmio(?:@\w+)?$/i, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-
-    // بررسی مالک
-    if (!isOwner(msg)) {
-
-        await sendAccessDenied(chatId);
-
-        return;
-    }
-
-
-    // فقط گروه
-    if (
-        msg.chat.type !== "group" &&
-        msg.chat.type !== "supergroup"
-    ) {
-
-        await bot.sendMessage(
-            chatId,
-            "❌ دستور /startmio فقط داخل گروه قابل استفاده است."
-        );
-
-        return;
-    }
-
-
-    // اگر قبلاً فعال است
-    if (activeGroups.has(chatId)) {
-
-        await bot.sendMessage(
-            chatId,
-            "🐱 میو در این گروه از قبل فعال است."
-        );
-
-        return;
-    }
-
-
-    console.log(
-        `✅ Mio activated | Group: ${chatId}`
-    );
-
-
-    await bot.sendMessage(
-        chatId,
-        "🐱 میو فعال شد!\n\n" +
-        "⏱️ هر ۵ دقیقه و ۲۰ ثانیه یک میو ارسال می‌شود."
-    );
-
-
-    const timer = setInterval(
-        async () => {
-
-            await sendMio(chatId);
-
-        },
-        MIO_INTERVAL
-    );
-
-
-    activeGroups.set(
-        chatId,
-        timer
-    );
-
-});
-
-
-// =====================================
-// ..M STOP MIO
-// =====================================
-
-bot.onText(/^\/stopmio(?:@\w+)?$/i, async (msg) => {
-
-    const chatId = msg.chat.id;
-
-
-    // بررسی مالک
-    if (!isOwner(msg)) {
-
-        await sendAccessDenied(chatId);
-
-        return;
-    }
-
-
-    // فقط گروه
-    if (
-        msg.chat.type !== "group" &&
-        msg.chat.type !== "supergroup"
-    ) {
-
-        await bot.sendMessage(
-            chatId,
-            "❌ دستور /stopmio فقط داخل گروه قابل استفاده است."
-        );
-
-        return;
-    }
-
-
-    const timer = activeGroups.get(chatId);
-
-
-    if (!timer) {
-
-        await bot.sendMessage(
-            chatId,
-            "🐱 میو در این گروه فعال نیست."
-        );
-
-        return;
-    }
-
-
-    clearInterval(timer);
-
-    activeGroups.delete(chatId);
-
-
-    console.log(
-        `🛑 Mio stopped | Group: ${chatId}`
-    );
-
-
-    await bot.sendMessage(
-        chatId,
-        "🛑 میو متوقف شد."
-    );
-
-});
-
-
-// =====================================
-// ..M SEND MIO
-// =====================================
-
-async function sendMio(chatId) {
-
+bot.onText(/^\/start$/, async (msg) => {
     try {
-
-        await bot.sendMessage(
-            chatId,
-            "میو 🐱"
-        );
-
-
-        console.log(
-            `🐱 Mio sent | Group: ${chatId} | ${new Date().toISOString()}`
-        );
-
-    } catch (error) {
-
-        console.error(
-            `❌ Failed to send Mio | Group: ${chatId}`,
-            error.message
-        );
-
-
-        if (
-            error.message.includes("chat not found") ||
-            error.message.includes("bot was kicked") ||
-            error.message.includes("Forbidden")
-        ) {
-
-            const timer = activeGroups.get(chatId);
-
-
-            if (timer) {
-
-                clearInterval(timer);
-
-                activeGroups.delete(chatId);
-
-            }
-
+        if (!isOwner(msg)) {
+            await sendSupportMessage(msg.chat.id);
+            return;
         }
 
+        await bot.sendMessage(
+            msg.chat.id,
+            "🤖 MioBot\n\n" +
+            "✅ خوش آمدید مدیر.\n\n" +
+            "🟢 ربات فعال است.\n" +
+            "⏱ فاصله ارسال میو: ۵ دقیقه و ۲۰ ثانیه"
+        );
+
+    } catch (error) {
+        console.error(
+            "❌ /start error:",
+            error.message
+        );
     }
-
-}
-
-
-// =====================================
-// ..M TELEGRAM ERROR
-// =====================================
-
-bot.on("polling_error", (error) => {
-
-    console.error(
-        "❌ Telegram polling error:",
-        error.message
-    );
-
 });
 
+// =====================================
+// /status
+// =====================================
+
+bot.onText(/^\/status$/, async (msg) => {
+    try {
+        if (!isOwner(msg)) {
+            await sendSupportMessage(msg.chat.id);
+            return;
+        }
+
+        await bot.sendMessage(
+            msg.chat.id,
+            "🤖 MioBot\n\n" +
+            "🟢 وضعیت: فعال\n" +
+            "⏱ فاصله: ۵ دقیقه و ۲۰ ثانیه\n" +
+            "👤 مالک: @" + OWNER_USERNAME
+        );
+
+    } catch (error) {
+        console.error(
+            "❌ /status error:",
+            error.message
+        );
+    }
+});
 
 // =====================================
-// ..M SHUTDOWN
+// پیام‌های معمولی
 // =====================================
 
-function shutdown(signal) {
+bot.on("message", async (msg) => {
+    try {
+        if (!msg || !msg.text) return;
 
-    console.log(
-        `🛑 Received ${signal}`
-    );
+        // دستورات را جداگانه مدیریت می‌کنیم
+        if (
+            msg.text === "/start" ||
+            msg.text === "/status"
+        ) {
+            return;
+        }
 
+        // فقط مالک می‌تواند دستورات مدیریتی بفرستد
+        if (!isOwner(msg)) {
+            return;
+        }
 
-    for (const timer of activeGroups.values()) {
+    } catch (error) {
+        console.error(
+            "❌ Message handler error:",
+            error.message
+        );
+    }
+});
 
-        clearInterval(timer);
+// =====================================
+// ارسال «میو»
+// =====================================
 
+async function sendMio() {
+    if (!GROUP_CHAT_ID) {
+        console.error(
+            "⚠️ GROUP_CHAT_ID is not configured."
+        );
+        return;
     }
 
+    try {
+        await bot.sendMessage(
+            GROUP_CHAT_ID,
+            "میو"
+        );
 
-    activeGroups.clear();
+        console.log(
+            "😺 میو ارسال شد | " +
+            new Date().toISOString()
+        );
 
-
-    bot.stopPolling();
-
-
-    process.exit(0);
-
+    } catch (error) {
+        console.error(
+            "❌ Error sending میو:",
+            error.message
+        );
+    }
 }
 
+// =====================================
+// تایمر ۵ دقیقه و ۲۰ ثانیه
+// =====================================
+
+setInterval(
+    sendMio,
+    MIO_INTERVAL
+);
+
+// =====================================
+// Web Server برای Render
+// =====================================
+
+const server = http.createServer(
+    (req, res) => {
+
+        // Health Check
+        if (
+            req.method === "GET" &&
+            req.url === "/"
+        ) {
+            res.writeHead(
+                200,
+                {
+                    "Content-Type":
+                        "application/json; charset=utf-8"
+                }
+            );
+
+            res.end(
+                JSON.stringify({
+                    ok: true,
+                    service: "MioBot",
+                    status: "online"
+                })
+            );
+
+            return;
+        }
+
+        if (
+            req.method === "GET" &&
+            req.url === "/health"
+        ) {
+            res.writeHead(
+                200,
+                {
+                    "Content-Type":
+                        "application/json; charset=utf-8"
+                }
+            );
+
+            res.end(
+                JSON.stringify({
+                    ok: true,
+                    bot: "MioBot",
+                    status: "running"
+                })
+            );
+
+            return;
+        }
+
+        res.writeHead(404);
+        res.end("Not Found");
+    }
+);
+
+// =====================================
+// شروع Web Server
+// =====================================
+
+server.listen(
+    PORT,
+    "0.0.0.0",
+    () => {
+
+        console.log(
+            "====================================="
+        );
+
+        console.log(
+            "🤖 MioBot"
+        );
+
+        console.log(
+            "====================================="
+        );
+
+        console.log(
+            "✅ Bot started successfully"
+        );
+
+        console.log(
+            "⏱ Mio interval: 5 minutes 20 seconds"
+        );
+
+        console.log(
+            "👤 Owner: " + OWNER_USERNAME
+        );
+
+        console.log(
+            "🌐 HTTP server listening on port: " +
+            PORT
+        );
+
+        console.log(
+            "====================================="
+        );
+    }
+);
+
+// =====================================
+// خطاهای Polling
+// =====================================
+
+bot.on(
+    "polling_error",
+    (error) => {
+        console.error(
+            "❌ Telegram polling error:",
+            error.message
+        );
+    }
+);
+
+// =====================================
+// خطاهای عمومی
+// =====================================
 
 process.on(
-    "SIGINT",
-    () => shutdown("SIGINT")
+    "uncaughtException",
+    (error) => {
+        console.error(
+            "❌ Uncaught Exception:",
+            error
+        );
+    }
 );
 
 process.on(
-    "SIGTERM",
-    () => shutdown("SIGTERM")
+    "unhandledRejection",
+    (error) => {
+        console.error(
+            "❌ Unhandled Rejection:",
+            error
+        );
+    }
 );
